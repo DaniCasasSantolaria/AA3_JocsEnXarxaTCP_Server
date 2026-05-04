@@ -10,7 +10,7 @@
 
 #define LISTENER_PORT 55007
 
-enum packetType { HANDSHAKE, LOGIN, REGISTER, RANKING, CREATE_LOBBY, JOIN_LOBBY, OPEN_LISTENER, CLIENT_PORT, PEER_LIST, TURN_ACTION, PLAYER_INFO, WIN_NOTIFICATION, GAME_RESULT };
+enum packetType { HANDSHAKE, LOGIN, REGISTER, RANKING, CREATE_LOBBY, JOIN_LOBBY, GAME_RESULT };
 
 class PacketManager {
 private:
@@ -36,9 +36,4 @@ public:
     void DisconnectClient(Client* client, LobbyManager& lobbyManager, sf::SocketSelector& selector);
 
     void SendData(sf::TcpSocket& client, sf::Packet& packet);
-
-    void SendPeerListToLobby(Lobby* lobby);
-
-    void NotifyToLobby(Lobby* lobby);
 };
-

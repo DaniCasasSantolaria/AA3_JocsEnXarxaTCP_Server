@@ -93,29 +93,11 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 			lobby = lobbyManager.GetLobby(idLobby);
 			// Si la sala está completa, avisa a todos los clientes
 			if (lobby->IsFull()) {
-				NotifyToLobby(lobby);
+				//Notificar a los clientes que empieza el juego
 			}
 		}
 
 		response << JOIN_LOBBY << idLobby << lobbyResult;
-		break;
-	}
-	case CLIENT_PORT:
-	{
-		std::string lobbyId;
-		int port = 0;
-
-		packet >> lobbyId >> port;
-
-		client.SetPort(port);
-
-		Lobby* lobby = lobbyManager.GetLobby(lobbyId);
-		// Una vez ya estan los puertos de todos los clientes, se envía una lista con las IPs y puertos para que los clientes se conecten entre ellos
-		if (lobby->AllPortsReported()) {
-			SendPeerListToLobby(lobby);
-		}
-
-		sendResponse = false;
 		break;
 	}
 	case GAME_RESULT:
@@ -189,30 +171,5 @@ void PacketManager::SendData(sf::TcpSocket& client, sf::Packet& packet) {
 	}
 	else {
 		std::cerr << "Error al enviar el mensaje al cliente" << std::endl;
-	}
-}
-
-// Envía la lista de IP y puerto a todos los clientes de una sala
-void PacketManager::SendPeerListToLobby(Lobby* lobby) {
-	std::vector<Client*> lobbyClients = lobby->GetClients();
-	int total = lobbyClients.size();
-	for (int i = 0; i < total; i++) {
-		sf::Packet peerListPacket;
-		peerListPacket << PEER_LIST << i << total;
-		for (int j = 0; j < total; j++) {
-			peerListPacket << lobbyClients[j]->GetAddress() << lobbyClients[j]->GetPort() << j;
-		}
-		SendData(lobbyClients[i]->GetSocket(), peerListPacket);
-	}
-}
-
-// Notifica a todos los clientes de que la partida va a comenzar
-void PacketManager::NotifyToLobby(Lobby* lobby) {
-	std::vector<Client*> lobbyClients = lobby->GetClients();
-
-	for (int i = 0; i < (int)lobbyClients.size(); i++) {
-		sf::Packet notifyPacket;
-		notifyPacket << OPEN_LISTENER << i << lobby->GetIdLobby();
-		SendData(lobbyClients[i]->GetSocket(), notifyPacket);
 	}
 }
