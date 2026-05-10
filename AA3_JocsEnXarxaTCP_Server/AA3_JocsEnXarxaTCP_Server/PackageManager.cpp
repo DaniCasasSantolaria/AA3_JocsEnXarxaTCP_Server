@@ -1,11 +1,43 @@
 #include "PackageManager.h"
+#include <iostream>
+
+sf::Packet& operator <<(sf::Packet& packet, packetType type) {
+	return packet << static_cast<short>(type);
+}
+
+sf::Packet& operator <<(sf::Packet& packet, authResult result) {
+	return packet << static_cast<short>(result);
+}
+
+sf::Packet& operator <<(sf::Packet& packet, lobbyResult result) {
+	return packet << static_cast<short>(result);
+}
+
+sf::Packet& operator >>(sf::Packet& packet, packetType& type) {
+	short temp;
+	packet >> temp;
+	type = static_cast<packetType>(temp);
+	return packet;
+}
+
+sf::Packet& operator >>(sf::Packet& packet, authResult& result) {
+	short temp;
+	packet >> temp;
+	result = static_cast<authResult>(temp);
+	return packet;
+}
+
+sf::Packet& operator >>(sf::Packet& packet, lobbyResult& result) {
+	short temp;
+	packet >> temp;
+	result = static_cast<lobbyResult>(temp);
+	return packet;
+}
 
 // Procesa los paquetes recibidos del cliente
 void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& db, LobbyManager& lobbyManager, std::unordered_map<std::string, std::vector<std::vector<std::string>>>& gameResults) {
-	int intType = 0;
-	packet >> intType;
-
-	packetType type = static_cast<packetType>(intType);
+	packetType type;
+	packet >> type;
 
 	bool sendResponse = true;
 	sf::Packet response;
@@ -24,13 +56,17 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 
 		packet >> userName >> password;
 
-		int authResultInt = db.Login(userName, password);
+		authResult result = db.Login(userName, password);
 
-		if (authResultInt == LOGIN_OK) {
+		if (result == LOGIN_OK) {
 			client.SetUsername(userName);
 		}
-		response << LOGIN << userName << password << authResultInt << db.GetScore(userName);
-		std::cout << "Score: " << db.GetScore(userName) << std::endl;
+
+		int score = db.GetScore(userName);
+
+		response << LOGIN << userName << password << result << score;
+
+		std::cout << "Score: " << score << std::endl;
 		break;
 	}
 	case REGISTER:
@@ -40,9 +76,9 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 
 		packet >> userName >> password;
 
-		int authResultInt = db.CreateUser(userName, password);
+		authResult result = db.CreateUser(userName, password);
 
-		response << REGISTER << userName << password << authResultInt;
+		response << REGISTER << userName << password << result;
 		break;
 	}
 	case RANKING:
@@ -53,76 +89,104 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 
 		std::vector<PlayerScore> ranking = db.GetRanking(clientUsername);
 
-		response << type;
+		response << RANKING;
 
-		for (int i = 0; i < ranking.size(); i++) {
+		for (unsigned short i = 0; i < static_cast<unsigned short>(ranking.size()); i++) {
 			response << ranking[i].name << ranking[i].score << ranking[i].position;
 		}
+
 		break;
 	}
-	case CREATE_LOBBY:
+	case MATCHMAKE:
 	{
-		std::string idLobby;
+		short modeInt;
+		packet >> modeInt;
 
-		packet >> idLobby;
+		matchMode mode = static_cast<matchMode>(modeInt);
 
-		int lobbyResultInt = lobbyManager.CreateLobby(idLobby, &client);
+		MatchmakingPlayer player;
+		player.client = &client;
+		player.mode = mode;
 
-		response << CREATE_LOBBY << idLobby << lobbyResultInt;
-		break;
-	}
-	case JOIN_LOBBY:
-	{
-		std::string idLobby;
+		if (mode == COMPETITIVE) {
+			competitiveQueue.push(player);
 
-		packet >> idLobby;
+			std::cout << "Player added to COMPETITIVE queue: " << client.GetUsername() << std::endl;
 
-		lobbyResult lobbyResult;
-		Lobby* lobby = lobbyManager.GetLobby(idLobby);
+			if (competitiveQueue.size() >= 2) {
+				MatchmakingPlayer p1 = competitiveQueue.front();
+				competitiveQueue.pop();
 
-		if (lobby == nullptr) {
-			lobbyResult = LOBBY_NOT_FOUND;
-		}
-		else if (lobby->IsFull()) {
-			lobbyResult = LOBBY_FULL;
-		}
-		else {
-			lobbyManager.AddClientToLobby(idLobby, &client);
-			lobbyResult = LOBBY_JOINED_OK;
+				MatchmakingPlayer p2 = competitiveQueue.front();
+				competitiveQueue.pop();
 
-			lobby = lobbyManager.GetLobby(idLobby);
-			// Si la sala está completa, avisa a todos los clientes
-			if (lobby->IsFull()) {
-				//Notificar a los clientes que empieza el juego
+				std::cout << "Starting COMPETITIVE match between "
+					<< p1.client->GetUsername()
+					<< " and "
+					<< p2.client->GetUsername()
+					<< std::endl;
 			}
 		}
+		else if (mode == NON_COMPETITIVE) {
+			nonCompetitiveQueue.push(player);
 
-		response << JOIN_LOBBY << idLobby << lobbyResult;
+			std::cout << "Player added to NON_COMPETITIVE queue: " << client.GetUsername() << std::endl;
+
+			if (nonCompetitiveQueue.size() >= 2) {
+				MatchmakingPlayer p1 = nonCompetitiveQueue.front();
+				nonCompetitiveQueue.pop();
+
+				MatchmakingPlayer p2 = nonCompetitiveQueue.front();
+				nonCompetitiveQueue.pop();
+
+				std::cout << "Starting NON_COMPETITIVE match between "
+					<< p1.client->GetUsername()
+					<< " and "
+					<< p2.client->GetUsername()
+					<< std::endl;
+			}
+		}
+		else {
+			std::cout << "Invalid matchmaking mode received from client" << std::endl;
+		}
+
+		response << MATCHMAKE;
 		break;
 	}
 	case GAME_RESULT:
 	{
 		std::string lobbyId;
-		int numPlayers;
+		unsigned short numPlayers = 0;
+
 		packet >> lobbyId >> numPlayers;
 
 		std::vector<std::string> ranking;
-		for (int i = 0; i < numPlayers; i++) {
+
+		for (unsigned short i = 0; i < numPlayers; i++) {
 			std::string username;
 			packet >> username;
 			ranking.push_back(username);
 		}
 
-		std::cout << "GAME_RESULT received: lobby=" << lobbyId << " numPlayers=" << numPlayers << std::endl;
-		for (int i = 0; i < (int)ranking.size(); i++)
+		std::cout << "GAME_RESULT received: lobby=" << lobbyId
+			<< " numPlayers=" << numPlayers << std::endl;
+
+		for (unsigned short i = 0; i < static_cast<unsigned short>(ranking.size()); i++) {
 			std::cout << "  [" << i << "] " << ranking[i] << std::endl;
+		}
 
 		gameResults[lobbyId].push_back(ranking);
-		std::cout << "  submissions so far: " << gameResults[lobbyId].size() << "/" << numPlayers << std::endl;
 
-		if ((int)gameResults[lobbyId].size() == numPlayers) {
+		std::cout << "  submissions so far: "
+			<< gameResults[lobbyId].size()
+			<< "/"
+			<< numPlayers
+			<< std::endl;
+
+		if (static_cast<unsigned short>(gameResults[lobbyId].size()) == numPlayers) {
 			bool valid = true;
-			for (int i = 1; i < numPlayers; i++) {
+
+			for (unsigned short i = 1; i < numPlayers; i++) {
 				if (gameResults[lobbyId][i] != gameResults[lobbyId][0]) {
 					valid = false;
 					std::cout << "  MISMATCH at submission " << i << std::endl;
@@ -132,14 +196,23 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 
 			if (valid) {
 				std::cout << "Game result validated for lobby " << lobbyId << std::endl;
-				for (int i = 0; i < numPlayers; i++) {
-					int points = 3 - i;
-					std::cout << "  Awarding " << points << " pts to " << gameResults[lobbyId][0][i] << std::endl;
+				const short WINNER_POINTS = 3;
+				for (unsigned short i = 0; i < numPlayers; i++) {
+					short points = static_cast<short>(WINNER_POINTS - static_cast<short>(i));
+
+					std::cout << "  Awarding " << points
+						<< " pts to "
+						<< gameResults[lobbyId][0][i]
+						<< std::endl;
+
 					db.UpdateScore(gameResults[lobbyId][0][i], points);
 				}
 			}
 			else {
-				std::cout << "Game result mismatch for lobby " << lobbyId << ", no points awarded" << std::endl;
+				std::cout << "Game result mismatch for lobby "
+					<< lobbyId
+					<< ", no points awarded"
+					<< std::endl;
 			}
 
 			gameResults.erase(lobbyId);

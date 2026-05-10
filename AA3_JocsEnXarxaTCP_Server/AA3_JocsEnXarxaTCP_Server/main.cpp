@@ -26,7 +26,7 @@ int main() {
 
 	selector.add(listener);
 
-	int nextClientId = 1;
+	unsigned short nextClientId = 1;
 
 	while (!closeServer) {
 		std::cout << "Waiting for connection..." << std::endl;

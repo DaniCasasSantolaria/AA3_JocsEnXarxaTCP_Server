@@ -23,68 +23,8 @@ void DataBase::DisconnectDataBase() {
 	}
 }
 
-void DataBase::GetAllUsers() {
-	try {
-		sql::Statement* stmt = con->createStatement();
-		sql::ResultSet* res = stmt->executeQuery("SELECT username FROM users");
-
-		std::cout << "Users in the database:" << std::endl;
-
-		while (res->next()) {
-			std::cout << "- " << res->getString("username") << std::endl;
-		}
-
-		delete stmt;
-		delete res;
-	}
-	catch (sql::SQLException& e) {
-		std::cerr << "Error while fetching users: " << e.what() << std::endl;
-	}
-}
-
-void DataBase::UpdatePassword(std::string user, std::string newPassword) {
-	try
-	{
-		std::string query = "UPDATE users SET pswd = ? WHERE username = ?'";
-
-		sql::PreparedStatement* stmt = con->prepareStatement(query);
-
-		stmt->setString(1, newPassword);
-		stmt->setString(2, user);
-
-		std::cout << "Executing query: " << query << std::endl;
-
-		int affected_rows = stmt->executeUpdate();
-		std::cout << "Number of rows affected: " << affected_rows << std::endl;
-
-		delete stmt;
-	}
-	catch (sql::SQLException& e)
-	{
-		std::cerr << "Error updating password: " << e.what() << std::endl;
-	}
-}
-
-void DataBase::DeleteByUser(std::string user) {
-	try
-	{
-		sql::Statement* stmt = con->createStatement();
-		std::string query = "DELETE FROM users WHERE username = '" + user + "'";
-		int affected_rows = stmt->executeUpdate(query);
-		std::cout << "Number of rows affected: " << affected_rows << std::endl;
-		delete stmt;
-	}
-	catch (sql::SQLException& e)
-	{
-		std::cerr << "Error while deleting user: " << e.what() << std::endl;
-	}
-}
-
 authResult DataBase::CreateUser(std::string user, std::string password) {
-	try
-	{
-		std::string hash = bcrypt::generateHash(password);
-
+	try {
 		sql::Statement* stmt = con->createStatement();
 		std::string queryGetUsernames = "SELECT * FROM Users WHERE username = '" + user + "'";
 
@@ -102,12 +42,15 @@ authResult DataBase::CreateUser(std::string user, std::string password) {
 			// caracteres especiales y daba errores al intentar insertar el usuario con un statement normal
 			std::string hash = bcrypt::generateHash(password);
 
+			const unsigned short INITIAL_SCORE = 100;
+
 			std::unique_ptr<sql::PreparedStatement> stmt(
-				con->prepareStatement("INSERT INTO Users (username, pass, score) VALUES (?, ?, 100)")
+				con->prepareStatement("INSERT INTO Users (username, pass, score) VALUES (?, ?, ?)")
 			);
 
 			stmt->setString(1, user);
 			stmt->setString(2, hash);
+			stmt->setInt(3, INITIAL_SCORE);
 
 			int affected_rows = stmt->executeUpdate();
 
@@ -133,13 +76,11 @@ authResult DataBase::Login(std::string user, std::string password) {
 		stmt->setString(1, user);
 		sql::ResultSet* res = stmt->executeQuery();
 
-		bool valid = false;
-
 		if (res->next()) {
 			std::cout << "User finded" << std::endl;
 			std::string storedHash = res->getString("pass");
 
-			valid = bcrypt::validatePassword(password, storedHash);
+			bool valid = bcrypt::validatePassword(password, storedHash);
 
 			delete res;
 
@@ -172,13 +113,14 @@ std::vector<PlayerScore> DataBase::GetRanking(std::string clientUsername) {
 
 	try {
 		sql::Statement* stmt = con->createStatement();
-		sql::ResultSet* res = stmt->executeQuery("SELECT username, score FROM Users ORDER BY score DESC LIMIT 10");
+		unsigned const short RANKING_LIMIT = 10;
+		sql::ResultSet* res = stmt->executeQuery("SELECT username, score FROM Users ORDER BY score DESC LIMIT " + std::to_string(RANKING_LIMIT));
 
 		while (res->next()) {
 			PlayerScore playerScore;
 			playerScore.name = res->getString("username");
 			playerScore.score = res->getInt("score");
-			playerScore.position = ranking.size() + 1;
+			playerScore.position = static_cast<unsigned short>(ranking.size() + 1);
 			ranking.push_back(playerScore);
 		}
 
@@ -187,7 +129,7 @@ std::vector<PlayerScore> DataBase::GetRanking(std::string clientUsername) {
 
 
 		bool isClientInRanking = false;
-		for (int i = 0; i < ranking.size() || isClientInRanking; i++) {
+		for (unsigned short i = 0; i < static_cast<short>(ranking.size()) || isClientInRanking; i++) {
 			if (ranking[i].name == clientUsername) {
 				isClientInRanking = true;
 				break;
@@ -210,7 +152,7 @@ std::vector<PlayerScore> DataBase::GetRanking(std::string clientUsername) {
 				PlayerScore clientScore;
 				clientScore.name = res2->getString("username");
 				clientScore.score = res2->getInt("score");
-				clientScore.position = res2->getInt("ranking");
+				clientScore.position = static_cast<unsigned short>(res2->getInt("ranking"));
 				ranking.push_back(clientScore);
 			}			
 
@@ -244,7 +186,7 @@ int DataBase::GetScore(std::string username) {
 	}
 }
 
-void DataBase::UpdateScore(std::string username, int points) {
+void DataBase::UpdateScore(std::string username, short points) {
 	try {
 		std::unique_ptr<sql::PreparedStatement> stmt(
 			con->prepareStatement("UPDATE Users SET score = score + ? WHERE username = ?")
@@ -257,11 +199,4 @@ void DataBase::UpdateScore(std::string username, int points) {
 	catch (sql::SQLException& e) {
 		std::cerr << "Error updating score: " << e.what() << std::endl;
 	}
-}
-
-void DataBase::ConnectDataBase() {
-	sql::Driver* driver;
-	sql::Connection* con;
-	ConnectDataBase(driver);
-	con->setSchema(DATABASE);
 }

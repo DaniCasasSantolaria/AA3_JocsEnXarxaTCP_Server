@@ -5,18 +5,30 @@
 #include "Client.h"
 #include "DataBase.h"
 #include "LobbyManager.h"
+#include <queue>
 
 #define PM PacketManager::Instance()
 
 #define LISTENER_PORT 55007
 
-enum packetType { HANDSHAKE, LOGIN, REGISTER, RANKING, CREATE_LOBBY, JOIN_LOBBY, GAME_RESULT };
+enum packetType { HANDSHAKE, LOGIN, REGISTER, RANKING, MATCHMAKE, GAME_RESULT };
+
+enum matchMode { NON_COMPETITIVE, COMPETITIVE };
+
+struct MatchmakingPlayer {
+    Client* client;
+    matchMode mode;
+};
 
 class PacketManager {
 private:
     const sf::IpAddress SERVER_IP = sf::IpAddress(192, 168, 1, 39);
 
     sf::TcpSocket socket;
+
+    //Colas de matchmaking para cada modo
+    std::queue<MatchmakingPlayer> nonCompetitiveQueue;
+    std::queue<MatchmakingPlayer> competitiveQueue;
 
     PacketManager() = default;
     PacketManager(PacketManager&) = delete;

@@ -17,7 +17,7 @@ enum authResult { LOGIN_OK, USER_NOT_FOUND, WRONG_PASSWORD, REGISTER_OK, USER_AL
 struct PlayerScore {
 	std::string name = "";
 	int score = 0;
-	int position = 0;
+	unsigned short position = 0;
 };
 
 class DataBase {
@@ -36,12 +36,6 @@ public:
 
 	void DisconnectDataBase();
 
-	void GetAllUsers();
-
-	void UpdatePassword(std::string user, std::string newPassword);
-
-	void DeleteByUser(std::string user);
-
 	authResult CreateUser(std::string user, std::string password);
 
 	authResult Login(std::string user, std::string password);
@@ -50,7 +44,5 @@ public:
 
 	int GetScore(std::string username);
 
-	void UpdateScore(std::string username, int points);
-
-	void ConnectDataBase();
+	void UpdateScore(std::string username, short points);
 };
