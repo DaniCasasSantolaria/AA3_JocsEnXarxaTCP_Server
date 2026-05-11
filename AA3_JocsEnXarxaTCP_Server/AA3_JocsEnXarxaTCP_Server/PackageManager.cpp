@@ -1,5 +1,9 @@
 #include "PackageManager.h"
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+
 
 sf::Packet& operator <<(sf::Packet& packet, packetType type) {
 	return packet << static_cast<short>(type);
@@ -219,6 +223,51 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		}
 
 		sendResponse = false;
+		break;
+	}
+	case MAP_REQUEST:
+	{
+		response << MAP_DATA;
+
+		std::vector<std::pair<std::string, std::string>> maps;
+
+		//HECHO CON IA PARA LEER LOS MAPAS DE LA CARPETA resources/Maps, por si hay mas de un mapa y para no tener que hardcodearlos
+		for (const auto& entry : std::filesystem::recursive_directory_iterator("resources/Maps")) {
+			if (!entry.is_regular_file()) {
+				continue;
+			}
+
+			if (entry.path().extension() != ".txt") {
+				continue;
+			}
+
+			std::ifstream file(entry.path());
+			std::stringstream buffer;
+
+			if (!file.is_open()) {
+				std::cerr << "No se pudo abrir el mapa: " << entry.path() << std::endl;
+				continue;
+			}
+
+			buffer << file.rdbuf();
+
+			std::string relativePath = std::filesystem::relative(
+				entry.path(),
+				"resources/Maps"
+			).generic_string();
+
+			std::string mapContent = buffer.str();
+
+			maps.push_back({ relativePath, mapContent });
+		}
+
+		response << static_cast<unsigned short>(maps.size());
+
+		for (const auto& map : maps) {
+			response << map.first << map.second;
+		}
+
+		sendResponse = true;
 		break;
 	}
 	default:
