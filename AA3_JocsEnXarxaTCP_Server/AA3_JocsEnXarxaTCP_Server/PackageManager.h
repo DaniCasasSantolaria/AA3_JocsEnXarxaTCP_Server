@@ -15,6 +15,8 @@ enum packetType { HANDSHAKE, LOGIN, REGISTER, RANKING, MATCHMAKE, WIN_NOTIFICATI
 
 enum matchMode { NON_COMPETITIVE, COMPETITIVE };
 
+enum matchmakeStatus { QUEUE_WAITING, MATCH_FOUND};
+
 struct MatchmakingPlayer {
     Client* client;
     matchMode mode;
@@ -22,7 +24,7 @@ struct MatchmakingPlayer {
 
 class PacketManager {
 private:
-    const sf::IpAddress SERVER_IP = sf::IpAddress(192, 168, 1, 39);
+    const sf::IpAddress SERVER_IP = sf::IpAddress(192, 168, 1, 101);
 
     sf::TcpSocket socket;
 
