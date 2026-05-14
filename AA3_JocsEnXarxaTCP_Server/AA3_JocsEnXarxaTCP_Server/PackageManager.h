@@ -11,9 +11,13 @@
 
 #define LISTENER_PORT 55007
 
-enum packetType { HANDSHAKE, LOGIN, REGISTER, RANKING, MATCHMAKE, GAME_RESULT };
+enum packetType { HANDSHAKE, LOGIN, REGISTER, RANKING, MATCHMAKE, WIN_NOTIFICATION, GAME_RESULT, MAP_REQUEST };
 
 enum matchMode { NON_COMPETITIVE, COMPETITIVE };
+
+enum matchmakeStatus { QUEUE_WAITING, MATCH_FOUND};
+
+enum mapRequestType { MAP_VERSION_CHECK, MAP_UP_TO_DATE, MAP_UPDATE };
 
 struct MatchmakingPlayer {
     Client* client;
@@ -22,9 +26,7 @@ struct MatchmakingPlayer {
 
 class PacketManager {
 private:
-    const sf::IpAddress SERVER_IP = sf::IpAddress(192, 168, 1, 39);
-
-    sf::TcpSocket socket;
+    const unsigned short SERVER_MAP_VERSION = 2;							// ----------------------------------- MAP VERSION -----------------------------------
 
     //Colas de matchmaking para cada modo
     std::queue<MatchmakingPlayer> nonCompetitiveQueue;

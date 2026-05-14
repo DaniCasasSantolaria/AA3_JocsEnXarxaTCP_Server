@@ -1,5 +1,8 @@
 #include "PackageManager.h"
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 sf::Packet& operator <<(sf::Packet& packet, packetType type) {
 	return packet << static_cast<short>(type);
@@ -11,6 +14,14 @@ sf::Packet& operator <<(sf::Packet& packet, authResult result) {
 
 sf::Packet& operator <<(sf::Packet& packet, lobbyResult result) {
 	return packet << static_cast<short>(result);
+}
+
+sf::Packet& operator <<(sf::Packet& packet, matchMode mode) {
+	return packet << static_cast<short>(mode);
+}
+
+sf::Packet& operator <<(sf::Packet& packet, matchmakeStatus status) {
+	return packet << static_cast<short>(status);
 }
 
 sf::Packet& operator >>(sf::Packet& packet, packetType& type) {
@@ -31,6 +42,20 @@ sf::Packet& operator >>(sf::Packet& packet, lobbyResult& result) {
 	short temp;
 	packet >> temp;
 	result = static_cast<lobbyResult>(temp);
+	return packet;
+}
+
+sf::Packet& operator >>(sf::Packet& packet, matchMode& mode) {
+	short temp;
+	packet >> temp;
+	mode = static_cast<matchMode>(temp);
+	return packet;
+}
+
+sf::Packet& operator >>(sf::Packet& packet, matchmakeStatus& status) {
+	short  temp;
+	packet >> temp;
+	status = static_cast<matchmakeStatus>(temp);
 	return packet;
 }
 
@@ -108,23 +133,16 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		player.client = &client;
 		player.mode = mode;
 
+		matchmakeStatus status = QUEUE_WAITING;
+
 		if (mode == COMPETITIVE) {
 			competitiveQueue.push(player);
 
 			std::cout << "Player added to COMPETITIVE queue: " << client.GetUsername() << std::endl;
 
 			if (competitiveQueue.size() >= 2) {
-				MatchmakingPlayer p1 = competitiveQueue.front();
-				competitiveQueue.pop();
 
-				MatchmakingPlayer p2 = competitiveQueue.front();
-				competitiveQueue.pop();
-
-				std::cout << "Starting COMPETITIVE match between "
-					<< p1.client->GetUsername()
-					<< " and "
-					<< p2.client->GetUsername()
-					<< std::endl;
+				status = MATCH_FOUND;
 			}
 		}
 		else if (mode == NON_COMPETITIVE) {
@@ -133,24 +151,45 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 			std::cout << "Player added to NON_COMPETITIVE queue: " << client.GetUsername() << std::endl;
 
 			if (nonCompetitiveQueue.size() >= 2) {
-				MatchmakingPlayer p1 = nonCompetitiveQueue.front();
-				nonCompetitiveQueue.pop();
-
-				MatchmakingPlayer p2 = nonCompetitiveQueue.front();
-				nonCompetitiveQueue.pop();
-
-				std::cout << "Starting NON_COMPETITIVE match between "
-					<< p1.client->GetUsername()
-					<< " and "
-					<< p2.client->GetUsername()
-					<< std::endl;
+				
+				status = MATCH_FOUND;
 			}
 		}
 		else {
 			std::cout << "Invalid matchmaking mode received from client" << std::endl;
+			break;
 		}
 
-		response << MATCHMAKE;
+		response << MATCHMAKE << mode << status;
+
+		if (status == MATCH_FOUND) {
+			bool isCompetitive = (mode == COMPETITIVE);
+
+			MatchmakingPlayer p1 = isCompetitive ? competitiveQueue.front() : nonCompetitiveQueue.front();
+			if (isCompetitive) {
+				competitiveQueue.pop();
+			} else {
+				nonCompetitiveQueue.pop();
+			}
+
+			MatchmakingPlayer p2 = isCompetitive ? competitiveQueue.front() : nonCompetitiveQueue.front();
+			if (isCompetitive) {
+				competitiveQueue.pop();
+			} else {
+				nonCompetitiveQueue.pop();
+			}
+
+			std::cout << "Starting " << (isCompetitive ? "COMPETITIVE" : "NON_COMPETITIVE") << " match between "
+				<< p1.client->GetUsername()	<< " and "  << p2.client->GetUsername()	<< std::endl;
+
+			sendResponse = false;
+
+			sf::Packet response2 = response;
+
+			SendData(p1.client->GetSocket(), response);
+			SendData(p2.client->GetSocket(), response2);
+		}
+
 		break;
 	}
 	case GAME_RESULT:
@@ -219,6 +258,41 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		}
 
 		sendResponse = false;
+		break;
+	}
+	case MAP_REQUEST:
+	{
+		short requestTypeValue;
+		packet >> requestTypeValue;
+
+		mapRequestType requestType = static_cast<mapRequestType>(requestTypeValue);
+
+		if (requestType == MAP_VERSION_CHECK) {
+			unsigned short clientMapVersion;
+			packet >> clientMapVersion;
+
+			if (clientMapVersion == SERVER_MAP_VERSION) {
+				response << MAP_REQUEST << static_cast<short>(MAP_UP_TO_DATE) << SERVER_MAP_VERSION;
+			}
+			else {
+				//La parte de leer ficheros hecha con IA y adaptada a lo que necesitavamos
+				std::ifstream file("resources/Maps/Map.txt");
+				std::stringstream buffer;
+
+				if (file.is_open()) {
+					buffer << file.rdbuf();
+				}
+				else {
+					std::cerr << "No se pudo abrir el mapa del servidor" << std::endl;
+				}
+
+				std::string mapContent = buffer.str();
+
+				response << MAP_REQUEST	<< static_cast<short>(MAP_UPDATE) << SERVER_MAP_VERSION	<< mapContent;
+			}
+
+			sendResponse = true;
+		}
 		break;
 	}
 	default:
