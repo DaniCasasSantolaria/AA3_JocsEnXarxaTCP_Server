@@ -26,7 +26,7 @@ struct MatchmakingPlayer {
 
 class PacketManager {
 private:
-    const unsigned short SERVER_MAP_VERSION = 2;							// ----------------------------------- MAP VERSION -----------------------------------
+    const unsigned short SERVER_MAP_VERSION = 1;							// ----------------------------------- MAP VERSION -----------------------------------
 
     //Colas de matchmaking para cada modo
     std::queue<MatchmakingPlayer> nonCompetitiveQueue;
