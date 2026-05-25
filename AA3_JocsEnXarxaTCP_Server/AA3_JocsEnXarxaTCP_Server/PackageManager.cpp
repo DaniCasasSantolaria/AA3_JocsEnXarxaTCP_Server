@@ -74,7 +74,7 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		response << HANDSHAKE << message;
 		break;
 	}
-	case TCP_SERVER_HANDSHAKE:
+	case SERVER_HANDSHAKE:
 	{
 		udpServerClient = &client;
 
@@ -98,7 +98,7 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 
 		int score = db.GetScore(userName);
 
-		response << LOGIN << userName << password << result << score;
+		response << LOGIN << userName << password << result << score << client.GetId();
 
 		std::cout << "Score: " << score << std::endl;
 		break;
@@ -246,20 +246,26 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 			if (udpServerClient != nullptr) {
 				sf::Packet udpServerPacket;
 
-				udpServerPacket << TCP_MATCH_CREATED
+				udpServerPacket << MATCH_CREATED
 					<< matchId
 					<< mode
 					<< p1.client->GetId()
 					<< p1.client->GetUsername()
+					<< p1.client->GetAddress()
+					<< p1.client->GetPort()
 					<< p2.client->GetId()
-					<< p2.client->GetUsername();
+					<< p2.client->GetUsername()
+					<< p2.client->GetAddress()
+					<< p2.client->GetPort();
 
 				SendData(udpServerClient->GetSocket(), udpServerPacket);
 
 				std::cout << "TCP Server notified UDP Server. MatchId: "
 					<< matchId
 					<< " | P1: " << p1.client->GetUsername()
+					<< p1.client->GetAddress() << ":" << p1.client->GetPort()
 					<< " | P2: " << p2.client->GetUsername()
+					<< p2.client->GetAddress() << ":" << p2.client->GetPort()
 					<< std::endl;
 			}
 			else {
