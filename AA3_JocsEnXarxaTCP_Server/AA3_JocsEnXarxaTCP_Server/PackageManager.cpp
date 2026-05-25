@@ -74,6 +74,15 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		response << HANDSHAKE << message;
 		break;
 	}
+	case TCP_SERVER_HANDSHAKE:
+	{
+		udpServerClient = &client;
+
+		std::cout << "UDP Gameplay Server connected to TCP Server. Connection IP: " << client.GetAddress() << std::endl;
+
+		sendResponse = false;
+		break;
+	}
 	case LOGIN:
 	{
 		std::string userName;
@@ -132,17 +141,74 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		MatchmakingPlayer player;
 		player.client = &client;
 		player.mode = mode;
+		player.score = db.GetScore(client.GetUsername());
 
 		matchmakeStatus status = QUEUE_WAITING;
 
+		MatchmakingPlayer p1;
+		MatchmakingPlayer p2;
+
 		if (mode == COMPETITIVE) {
-			competitiveQueue.push(player);
+			short insertIndex = 0;
 
-			std::cout << "Player added to COMPETITIVE queue: " << client.GetUsername() << std::endl;
+			while (insertIndex < competitiveQueue.size() &&
+				competitiveQueue[insertIndex].score < player.score) {
+				insertIndex++;
+			}
 
-			if (competitiveQueue.size() >= 2) {
+			competitiveQueue.insert(competitiveQueue.begin() + insertIndex, player);
 
+			std::cout << "Player added to COMPETITIVE queue: "
+				<< client.GetUsername()
+				<< " score: " << player.score
+				<< std::endl;
+
+			short bestIndex = -1;
+			short bestDifference = 100;
+
+			if (insertIndex > 0) {
+				short previousIndex = insertIndex - 1;
+				short difference = competitiveQueue[insertIndex].score - competitiveQueue[previousIndex].score;
+
+				if (difference < 0) {
+					difference = -difference;
+				}
+
+				if (difference < 100) {
+					bestIndex = previousIndex;
+					bestDifference = difference;
+				}
+			}
+
+			if (insertIndex + 1 < competitiveQueue.size()) {
+				short nextIndex = insertIndex + 1;
+
+				short difference = competitiveQueue[insertIndex].score - competitiveQueue[nextIndex].score;
+
+				if (difference < 0) {
+					difference = -difference;
+				}
+
+				if (difference < 100 && difference < bestDifference) {
+					bestIndex = nextIndex;
+					bestDifference = difference;
+				}
+			}
+
+			if (bestIndex != -1) {
 				status = MATCH_FOUND;
+
+				p1 = competitiveQueue[insertIndex];
+				p2 = competitiveQueue[bestIndex];
+
+				if (insertIndex > bestIndex) {
+					competitiveQueue.erase(competitiveQueue.begin() + insertIndex);
+					competitiveQueue.erase(competitiveQueue.begin() + bestIndex);
+				}
+				else {
+					competitiveQueue.erase(competitiveQueue.begin() + bestIndex);
+					competitiveQueue.erase(competitiveQueue.begin() + insertIndex);
+				}
 			}
 		}
 		else if (mode == NON_COMPETITIVE) {
@@ -151,8 +217,13 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 			std::cout << "Player added to NON_COMPETITIVE queue: " << client.GetUsername() << std::endl;
 
 			if (nonCompetitiveQueue.size() >= 2) {
-				
 				status = MATCH_FOUND;
+
+				p1 = nonCompetitiveQueue.front();
+				nonCompetitiveQueue.pop();
+
+				p2 = nonCompetitiveQueue.front();
+				nonCompetitiveQueue.pop();
 			}
 		}
 		else {
@@ -163,24 +234,37 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		response << MATCHMAKE << mode << status;
 
 		if (status == MATCH_FOUND) {
-			bool isCompetitive = (mode == COMPETITIVE);
+			unsigned short matchId = nextMatchId++;
 
-			MatchmakingPlayer p1 = isCompetitive ? competitiveQueue.front() : nonCompetitiveQueue.front();
-			if (isCompetitive) {
-				competitiveQueue.pop();
-			} else {
-				nonCompetitiveQueue.pop();
+			std::cout << "Starting " << (mode == COMPETITIVE ? "COMPETITIVE" : "NON_COMPETITIVE")
+				<< " match between "
+				<< p1.client->GetUsername()
+				<< " and "
+				<< p2.client->GetUsername()
+				<< std::endl;
+
+			if (udpServerClient != nullptr) {
+				sf::Packet udpServerPacket;
+
+				udpServerPacket << TCP_MATCH_CREATED
+					<< matchId
+					<< mode
+					<< p1.client->GetId()
+					<< p1.client->GetUsername()
+					<< p2.client->GetId()
+					<< p2.client->GetUsername();
+
+				SendData(udpServerClient->GetSocket(), udpServerPacket);
+
+				std::cout << "TCP Server notified UDP Server. MatchId: "
+					<< matchId
+					<< " | P1: " << p1.client->GetUsername()
+					<< " | P2: " << p2.client->GetUsername()
+					<< std::endl;
 			}
-
-			MatchmakingPlayer p2 = isCompetitive ? competitiveQueue.front() : nonCompetitiveQueue.front();
-			if (isCompetitive) {
-				competitiveQueue.pop();
-			} else {
-				nonCompetitiveQueue.pop();
+			else {
+				std::cout << "UDP Server is not connected. Match created but not notified." << std::endl;
 			}
-
-			std::cout << "Starting " << (isCompetitive ? "COMPETITIVE" : "NON_COMPETITIVE") << " match between "
-				<< p1.client->GetUsername()	<< " and "  << p2.client->GetUsername()	<< std::endl;
 
 			sendResponse = false;
 
@@ -189,7 +273,6 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 			SendData(p1.client->GetSocket(), response);
 			SendData(p2.client->GetSocket(), response2);
 		}
-
 		break;
 	}
 	case GAME_RESULT:
