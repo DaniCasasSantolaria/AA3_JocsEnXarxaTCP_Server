@@ -7,7 +7,7 @@ private:
 	unsigned short id;
 	std::string username;
 	sf::TcpSocket* socket;
-	unsigned short port = 0;
+	unsigned short port = 55008;
 
 public:
 	Client() : id(0), username("") {

@@ -11,26 +11,41 @@
 
 #define LISTENER_PORT 55007
 
-enum packetType { HANDSHAKE, LOGIN, REGISTER, RANKING, MATCHMAKE, WIN_NOTIFICATION, GAME_RESULT, MAP_REQUEST };
+enum packetType {
+    HANDSHAKE,
+    LOGIN,
+    REGISTER,
+    RANKING,
+    MATCHMAKE,
+    WIN_NOTIFICATION,
+    GAME_RESULT,
+    MAP_REQUEST,
+    SERVER_HANDSHAKE,
+    MATCH_CREATED,
+};
 
 enum matchMode { NON_COMPETITIVE, COMPETITIVE };
 
-enum matchmakeStatus { QUEUE_WAITING, MATCH_FOUND};
+enum matchmakeStatus { QUEUE_WAITING, MATCH_FOUND };
 
 enum mapRequestType { MAP_VERSION_CHECK, MAP_UP_TO_DATE, MAP_UPDATE };
 
 struct MatchmakingPlayer {
     Client* client;
     matchMode mode;
+    short score;
 };
 
 class PacketManager {
 private:
-    const unsigned short SERVER_MAP_VERSION = 2;							// ----------------------------------- MAP VERSION -----------------------------------
+    const unsigned short SERVER_MAP_VERSION = 1;							// ----------------------------------- MAP VERSION -----------------------------------
 
     //Colas de matchmaking para cada modo
     std::queue<MatchmakingPlayer> nonCompetitiveQueue;
-    std::queue<MatchmakingPlayer> competitiveQueue;
+    std::vector<MatchmakingPlayer> competitiveQueue;
+
+    Client* udpServerClient = nullptr;
+    unsigned short nextMatchId = 1;
 
     PacketManager() = default;
     PacketManager(PacketManager&) = delete;
