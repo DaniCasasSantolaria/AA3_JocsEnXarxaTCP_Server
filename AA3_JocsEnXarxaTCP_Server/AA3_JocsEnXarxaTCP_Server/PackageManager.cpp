@@ -251,12 +251,12 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 					<< mode
 					<< p1.client->GetId()
 					<< p1.client->GetUsername()
-					<< p1.client->GetAddress()
-					<< p1.client->GetPort()
+					//<< p1.client->GetAddress()
+					//<< p1.client->GetPort()
 					<< p2.client->GetId()
-					<< p2.client->GetUsername()
-					<< p2.client->GetAddress()
-					<< p2.client->GetPort();
+					<< p2.client->GetUsername();
+					//<< p2.client->GetAddress()
+					//<< p2.client->GetPort();
 
 				SendData(udpServerClient->GetSocket(), udpServerPacket);
 
