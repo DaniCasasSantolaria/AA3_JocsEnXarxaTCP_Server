@@ -149,65 +149,34 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		MatchmakingPlayer p2;
 
 		if (mode == COMPETITIVE) {
-			short insertIndex = 0;
-
-			while (insertIndex < competitiveQueue.size() &&
-				competitiveQueue[insertIndex].score < player.score) {
-				insertIndex++;
-			}
-
-			competitiveQueue.insert(competitiveQueue.begin() + insertIndex, player);
+			competitiveQueue.push_back(player);
 
 			std::cout << "Player added to COMPETITIVE queue: "
 				<< client.GetUsername()
 				<< " score: " << player.score
 				<< std::endl;
 
-			short bestIndex = -1;
-			short bestDifference = 100;
+			for (short i = 0; i < competitiveQueue.size(); i++) {
+				for (short j = i + 1; j < competitiveQueue.size(); j++) {
+					short difference = competitiveQueue[i].score - competitiveQueue[j].score;
 
-			if (insertIndex > 0) {
-				short previousIndex = insertIndex - 1;
-				short difference = competitiveQueue[insertIndex].score - competitiveQueue[previousIndex].score;
+					
 
-				if (difference < 0) {
-					difference = -difference;
+					if (std::abs(difference) <= MAX_SCORE_DIFFERENCE) {
+						status = MATCH_FOUND;
+
+						p1 = competitiveQueue[i];
+						p2 = competitiveQueue[j];
+
+						competitiveQueue.erase(competitiveQueue.begin() + j);
+						competitiveQueue.erase(competitiveQueue.begin() + i);
+
+						break;
+					}
 				}
 
-				if (difference < 100) {
-					bestIndex = previousIndex;
-					bestDifference = difference;
-				}
-			}
-
-			if (insertIndex + 1 < competitiveQueue.size()) {
-				short nextIndex = insertIndex + 1;
-
-				short difference = competitiveQueue[insertIndex].score - competitiveQueue[nextIndex].score;
-
-				if (difference < 0) {
-					difference = -difference;
-				}
-
-				if (difference < 100 && difference < bestDifference) {
-					bestIndex = nextIndex;
-					bestDifference = difference;
-				}
-			}
-
-			if (bestIndex != -1) {
-				status = MATCH_FOUND;
-
-				p1 = competitiveQueue[insertIndex];
-				p2 = competitiveQueue[bestIndex];
-
-				if (insertIndex > bestIndex) {
-					competitiveQueue.erase(competitiveQueue.begin() + insertIndex);
-					competitiveQueue.erase(competitiveQueue.begin() + bestIndex);
-				}
-				else {
-					competitiveQueue.erase(competitiveQueue.begin() + bestIndex);
-					competitiveQueue.erase(competitiveQueue.begin() + insertIndex);
+				if (status == MATCH_FOUND) {
+					break;
 				}
 			}
 		}
