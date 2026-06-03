@@ -149,65 +149,34 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 		MatchmakingPlayer p2;
 
 		if (mode == COMPETITIVE) {
-			short insertIndex = 0;
-
-			while (insertIndex < competitiveQueue.size() &&
-				competitiveQueue[insertIndex].score < player.score) {
-				insertIndex++;
-			}
-
-			competitiveQueue.insert(competitiveQueue.begin() + insertIndex, player);
+			competitiveQueue.push_back(player);
 
 			std::cout << "Player added to COMPETITIVE queue: "
 				<< client.GetUsername()
 				<< " score: " << player.score
 				<< std::endl;
 
-			short bestIndex = -1;
-			short bestDifference = 100;
+			for (short i = 0; i < competitiveQueue.size(); i++) {
+				for (short j = i + 1; j < competitiveQueue.size(); j++) {
+					short difference = competitiveQueue[i].score - competitiveQueue[j].score;
 
-			if (insertIndex > 0) {
-				short previousIndex = insertIndex - 1;
-				short difference = competitiveQueue[insertIndex].score - competitiveQueue[previousIndex].score;
+					
 
-				if (difference < 0) {
-					difference = -difference;
+					if (std::abs(difference) <= MAX_SCORE_DIFFERENCE) {
+						status = MATCH_FOUND;
+
+						p1 = competitiveQueue[i];
+						p2 = competitiveQueue[j];
+
+						competitiveQueue.erase(competitiveQueue.begin() + j);
+						competitiveQueue.erase(competitiveQueue.begin() + i);
+
+						break;
+					}
 				}
 
-				if (difference < 100) {
-					bestIndex = previousIndex;
-					bestDifference = difference;
-				}
-			}
-
-			if (insertIndex + 1 < competitiveQueue.size()) {
-				short nextIndex = insertIndex + 1;
-
-				short difference = competitiveQueue[insertIndex].score - competitiveQueue[nextIndex].score;
-
-				if (difference < 0) {
-					difference = -difference;
-				}
-
-				if (difference < 100 && difference < bestDifference) {
-					bestIndex = nextIndex;
-					bestDifference = difference;
-				}
-			}
-
-			if (bestIndex != -1) {
-				status = MATCH_FOUND;
-
-				p1 = competitiveQueue[insertIndex];
-				p2 = competitiveQueue[bestIndex];
-
-				if (insertIndex > bestIndex) {
-					competitiveQueue.erase(competitiveQueue.begin() + insertIndex);
-					competitiveQueue.erase(competitiveQueue.begin() + bestIndex);
-				}
-				else {
-					competitiveQueue.erase(competitiveQueue.begin() + bestIndex);
-					competitiveQueue.erase(competitiveQueue.begin() + insertIndex);
+				if (status == MATCH_FOUND) {
+					break;
 				}
 			}
 		}
@@ -283,68 +252,20 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 	}
 	case GAME_RESULT:
 	{
-		std::string lobbyId;
-		unsigned short numPlayers = 0;
+		unsigned short winnerId = 0;
+		std::string winnerUsername = "";
 
-		packet >> lobbyId >> numPlayers;
+		packet >> winnerId >> winnerUsername;
 
-		std::vector<std::string> ranking;
+		const short WIN_SCORE_REWARD = 100;
 
-		for (unsigned short i = 0; i < numPlayers; i++) {
-			std::string username;
-			packet >> username;
-			ranking.push_back(username);
-		}
+		int oldScore = db.GetScore(winnerUsername);
 
-		std::cout << "GAME_RESULT received: lobby=" << lobbyId
-			<< " numPlayers=" << numPlayers << std::endl;
+		db.UpdateScore(winnerUsername, WIN_SCORE_REWARD);
 
-		for (unsigned short i = 0; i < static_cast<unsigned short>(ranking.size()); i++) {
-			std::cout << "  [" << i << "] " << ranking[i] << std::endl;
-		}
+		int newScore = db.GetScore(winnerUsername);
 
-		gameResults[lobbyId].push_back(ranking);
-
-		std::cout << "  submissions so far: "
-			<< gameResults[lobbyId].size()
-			<< "/"
-			<< numPlayers
-			<< std::endl;
-
-		if (static_cast<unsigned short>(gameResults[lobbyId].size()) == numPlayers) {
-			bool valid = true;
-
-			for (unsigned short i = 1; i < numPlayers; i++) {
-				if (gameResults[lobbyId][i] != gameResults[lobbyId][0]) {
-					valid = false;
-					std::cout << "  MISMATCH at submission " << i << std::endl;
-					break;
-				}
-			}
-
-			if (valid) {
-				std::cout << "Game result validated for lobby " << lobbyId << std::endl;
-				const short WINNER_POINTS = 3;
-				for (unsigned short i = 0; i < numPlayers; i++) {
-					short points = static_cast<short>(WINNER_POINTS - static_cast<short>(i));
-
-					std::cout << "  Awarding " << points
-						<< " pts to "
-						<< gameResults[lobbyId][0][i]
-						<< std::endl;
-
-					db.UpdateScore(gameResults[lobbyId][0][i], points);
-				}
-			}
-			else {
-				std::cout << "Game result mismatch for lobby "
-					<< lobbyId
-					<< ", no points awarded"
-					<< std::endl;
-			}
-
-			gameResults.erase(lobbyId);
-		}
+		std::cout << "Score updated for: " << winnerUsername << std::endl << " | Old score: " << oldScore << " | New score: " << newScore << std::endl;
 
 		sendResponse = false;
 		break;

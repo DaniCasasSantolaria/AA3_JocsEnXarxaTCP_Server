@@ -47,6 +47,9 @@ private:
     Client* udpServerClient = nullptr;
     unsigned short nextMatchId = 1;
 
+    //Matchmake
+    const short MAX_SCORE_DIFFERENCE = 500;
+
     PacketManager() = default;
     PacketManager(PacketManager&) = delete;
     PacketManager& operator =(const PacketManager&) = delete;
