@@ -15,8 +15,6 @@ int main() {
 
 	std::unordered_map<std::string, Client*> clients;
 
-	LobbyManager lobbyManager;
-
 	std::unordered_map<std::string, std::vector<std::vector<std::string>>> gameResults;
 
 	if (listener.listen(LISTENER_PORT) != sf::Socket::Status::Done) {
