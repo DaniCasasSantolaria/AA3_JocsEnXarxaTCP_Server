@@ -56,11 +56,11 @@ int main() {
 					sf::Socket::Status status = client->GetSocket().receive(packet);
 
 					if (status == sf::Socket::Status::Done) {
-						PM->HandlePacket(*client, packet, db, lobbyManager, gameResults);
+						PM->HandlePacket(*client, packet, db, gameResults);
 						it++;
 					}
 					else if (status == sf::Socket::Status::Disconnected) {
-						PM->DisconnectClient(client, lobbyManager, selector);
+						PM->DisconnectClient(client, selector);
 						it = clients.erase(it);
 					}
 					else {
