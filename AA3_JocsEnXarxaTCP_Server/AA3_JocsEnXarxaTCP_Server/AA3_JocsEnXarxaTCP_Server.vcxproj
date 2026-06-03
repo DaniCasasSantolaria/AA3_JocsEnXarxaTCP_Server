@@ -135,8 +135,6 @@
     <ClCompile Include="Bcrypt\blowfish.cpp" />
     <ClCompile Include="Client.cpp" />
     <ClCompile Include="DataBase.cpp" />
-    <ClCompile Include="Lobby.cpp" />
-    <ClCompile Include="LobbyManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PackageManager.cpp" />
   </ItemGroup>
@@ -146,8 +144,6 @@
     <ClInclude Include="Bcrypt\openbsd.h" />
     <ClInclude Include="Client.h" />
     <ClInclude Include="DataBase.h" />
-    <ClInclude Include="Lobby.h" />
-    <ClInclude Include="LobbyManager.h" />
     <ClInclude Include="PackageManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

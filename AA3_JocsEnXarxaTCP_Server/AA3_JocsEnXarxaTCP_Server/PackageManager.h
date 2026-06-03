@@ -4,7 +4,6 @@
 #include <SFML/Network.hpp>
 #include "Client.h"
 #include "DataBase.h"
-#include "LobbyManager.h"
 #include <queue>
 
 #define PM PacketManager::Instance()
@@ -63,9 +62,9 @@ public:
 
     void PairToPair() {};
 
-    void HandlePacket(Client& client, sf::Packet& packet, DataBase& db, LobbyManager& lobbyManager, std::unordered_map<std::string, std::vector<std::vector<std::string>>>& gameResults);
+    void HandlePacket(Client& client, sf::Packet& packet, DataBase& db, std::unordered_map<std::string, std::vector<std::vector<std::string>>>& gameResults);
 
-    void DisconnectClient(Client* client, LobbyManager& lobbyManager, sf::SocketSelector& selector);
+    void DisconnectClient(Client* client, sf::SocketSelector& selector);
 
     void SendData(sf::TcpSocket& client, sf::Packet& packet);
 };

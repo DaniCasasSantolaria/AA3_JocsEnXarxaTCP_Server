@@ -12,10 +12,6 @@ sf::Packet& operator <<(sf::Packet& packet, authResult result) {
 	return packet << static_cast<short>(result);
 }
 
-sf::Packet& operator <<(sf::Packet& packet, lobbyResult result) {
-	return packet << static_cast<short>(result);
-}
-
 sf::Packet& operator <<(sf::Packet& packet, matchMode mode) {
 	return packet << static_cast<short>(mode);
 }
@@ -38,13 +34,6 @@ sf::Packet& operator >>(sf::Packet& packet, authResult& result) {
 	return packet;
 }
 
-sf::Packet& operator >>(sf::Packet& packet, lobbyResult& result) {
-	short temp;
-	packet >> temp;
-	result = static_cast<lobbyResult>(temp);
-	return packet;
-}
-
 sf::Packet& operator >>(sf::Packet& packet, matchMode& mode) {
 	short temp;
 	packet >> temp;
@@ -60,7 +49,7 @@ sf::Packet& operator >>(sf::Packet& packet, matchmakeStatus& status) {
 }
 
 // Procesa los paquetes recibidos del cliente
-void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& db, LobbyManager& lobbyManager, std::unordered_map<std::string, std::vector<std::vector<std::string>>>& gameResults) {
+void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& db, std::unordered_map<std::string, std::vector<std::vector<std::string>>>& gameResults) {
 	packetType type;
 	packet >> type;
 
@@ -156,11 +145,9 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 				<< " score: " << player.score
 				<< std::endl;
 
-			for (short i = 0; i < competitiveQueue.size(); i++) {
-				for (short j = i + 1; j < competitiveQueue.size(); j++) {
+			for (unsigned short i = 0; i < competitiveQueue.size(); i++) {
+				for (unsigned short j = i + 1; j < competitiveQueue.size(); j++) {
 					short difference = competitiveQueue[i].score - competitiveQueue[j].score;
-
-					
 
 					if (std::abs(difference) <= MAX_SCORE_DIFFERENCE) {
 						status = MATCH_FOUND;
@@ -206,36 +193,20 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 			unsigned short matchId = nextMatchId++;
 
 			std::cout << "Starting " << (mode == COMPETITIVE ? "COMPETITIVE" : "NON_COMPETITIVE")
-				<< " match between "
-				<< p1.client->GetUsername()
-				<< " and "
-				<< p2.client->GetUsername()
-				<< std::endl;
+				<< " match between " << p1.client->GetUsername() << " and "	<< p2.client->GetUsername()	<< std::endl;
 
 			if (udpServerClient != nullptr) {
 				sf::Packet udpServerPacket;
 
-				udpServerPacket << MATCH_CREATED
-					<< matchId
-					<< mode
-					<< p1.client->GetId()
-					<< p1.client->GetUsername()
-					//<< p1.client->GetAddress()
-					//<< p1.client->GetPort()
-					<< p2.client->GetId()
-					<< p2.client->GetUsername();
-					//<< p2.client->GetAddress()
-					//<< p2.client->GetPort();
+				udpServerPacket << MATCH_CREATED << matchId << mode
+					<< p1.client->GetId() << p1.client->GetUsername()
+					<< p2.client->GetId()<< p2.client->GetUsername();
 
 				SendData(udpServerClient->GetSocket(), udpServerPacket);
 
 				std::cout << "TCP Server notified UDP Server. MatchId: "
-					<< matchId
-					<< " | P1: " << p1.client->GetUsername()
-					<< p1.client->GetAddress() << ":" << p1.client->GetPort()
-					<< " | P2: " << p2.client->GetUsername()
-					<< p2.client->GetAddress() << ":" << p2.client->GetPort()
-					<< std::endl;
+					<< matchId << " | P1: " << p1.client->GetUsername()	<< p1.client->GetAddress() << ":" << p1.client->GetPort()
+					<< " | P2: " << p2.client->GetUsername() << p2.client->GetAddress() << ":" << p2.client->GetPort() << std::endl;
 			}
 			else {
 				std::cout << "UDP Server is not connected. Match created but not notified." << std::endl;
@@ -315,8 +286,7 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 	}
 }
 
-void PacketManager::DisconnectClient(Client* client, LobbyManager& lobbyManager, sf::SocketSelector& selector) {
-	lobbyManager.RemoveClientFromAllLobbies(client);
+void PacketManager::DisconnectClient(Client* client, sf::SocketSelector& selector) {
 	selector.remove(client->GetSocket());
 	client->GetSocket().disconnect();
 }
