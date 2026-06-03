@@ -283,68 +283,20 @@ void PacketManager::HandlePacket(Client& client, sf::Packet& packet, DataBase& d
 	}
 	case GAME_RESULT:
 	{
-		std::string lobbyId;
-		unsigned short numPlayers = 0;
+		unsigned short winnerId = 0;
+		std::string winnerUsername = "";
 
-		packet >> lobbyId >> numPlayers;
+		packet >> winnerId >> winnerUsername;
 
-		std::vector<std::string> ranking;
+		const short WIN_SCORE_REWARD = 100;
 
-		for (unsigned short i = 0; i < numPlayers; i++) {
-			std::string username;
-			packet >> username;
-			ranking.push_back(username);
-		}
+		int oldScore = db.GetScore(winnerUsername);
 
-		std::cout << "GAME_RESULT received: lobby=" << lobbyId
-			<< " numPlayers=" << numPlayers << std::endl;
+		db.UpdateScore(winnerUsername, WIN_SCORE_REWARD);
 
-		for (unsigned short i = 0; i < static_cast<unsigned short>(ranking.size()); i++) {
-			std::cout << "  [" << i << "] " << ranking[i] << std::endl;
-		}
+		int newScore = db.GetScore(winnerUsername);
 
-		gameResults[lobbyId].push_back(ranking);
-
-		std::cout << "  submissions so far: "
-			<< gameResults[lobbyId].size()
-			<< "/"
-			<< numPlayers
-			<< std::endl;
-
-		if (static_cast<unsigned short>(gameResults[lobbyId].size()) == numPlayers) {
-			bool valid = true;
-
-			for (unsigned short i = 1; i < numPlayers; i++) {
-				if (gameResults[lobbyId][i] != gameResults[lobbyId][0]) {
-					valid = false;
-					std::cout << "  MISMATCH at submission " << i << std::endl;
-					break;
-				}
-			}
-
-			if (valid) {
-				std::cout << "Game result validated for lobby " << lobbyId << std::endl;
-				const short WINNER_POINTS = 3;
-				for (unsigned short i = 0; i < numPlayers; i++) {
-					short points = static_cast<short>(WINNER_POINTS - static_cast<short>(i));
-
-					std::cout << "  Awarding " << points
-						<< " pts to "
-						<< gameResults[lobbyId][0][i]
-						<< std::endl;
-
-					db.UpdateScore(gameResults[lobbyId][0][i], points);
-				}
-			}
-			else {
-				std::cout << "Game result mismatch for lobby "
-					<< lobbyId
-					<< ", no points awarded"
-					<< std::endl;
-			}
-
-			gameResults.erase(lobbyId);
-		}
+		std::cout << "Score updated for: " << winnerUsername << std::endl << " | Old score: " << oldScore << " | New score: " << newScore << std::endl;
 
 		sendResponse = false;
 		break;
